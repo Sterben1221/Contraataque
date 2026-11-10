@@ -1,1 +1,40 @@
+name: Compilar para PS2
 
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ps2dev/ps2dev:latest
+    steps:
+      - name: Instalar herramientas
+        run: apk add --no-cache build-base git xorriso
+
+      - name: Descargar el codigo
+        uses: actions/checkout@v4
+
+      - name: Compilar .elf
+        run: |
+          make clean
+          make
+          mips64r5900el-ps2-elf-strip contraataque.elf || true
+          ls -l contraataque.elf
+
+      - name: Crear .iso
+        run: |
+          mkdir -p iso_root
+          cp contraataque.elf iso_root/SLUS_999.99
+          printf 'BOOT2 = cdrom0:\\SLUS_999.99;1\r\nVER = 1.00\r\nVMODE = NTSC\r\n' > iso_root/SYSTEM.CNF
+          xorriso -as mkisofs -iso-level 1 -V CONTRAATAQUE -sysid PLAYSTATION -o contraataque.iso iso_root
+          ls -l contraataque.iso
+
+      - name: Subir resultado
+        uses: actions/upload-artifact@v4
+        with:
+          name: contraataque-ps2
+          path: |
+            contraataque.elf
+            contraataque.iso
